@@ -1,0 +1,6 @@
+#BNF+IAT 1.0 UTF-8;
+!grammar cmd;
+!slot <cmd>;
+!start <cmdstart>;
+<cmdstart>:<cmd>;
+<cmd>:你好!id(1)|再见!id(2)|打开车灯!id(10)|关闭车灯!id(11)|打开空调!id(20)|关闭空调!id(21)|空调升温!id(22)|空调降温!id(23)|打开车窗!id(30)|关闭车窗!id(31)|显示当前场景!id(100);

@@ -1,0 +1,94 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <string.h>
+#include <fcntl.h>
+#include "font.h"
+#include "lcd.h"
+extern unsigned char *lcd;
+
+ void showbitmap(bitmap *bm, int x0, int y0)
+{
+    // 准备好LCD设备（如果多次显示，应该只做一遍）
+
+    // 字体的信息：
+    // bm->width;
+    // bm->height;
+    // bm->byteperpixel;
+    // bm->map; // 指向RGB数据，没有上下颠倒，也没有一行4字节倍数的约束，就是纯粹的RGB
+
+    //printf("width:%d, height:%d, byteperpixel:%d\n", bm->width, bm->height, bm->byteperpixel);
+	int x,y;
+	int bgrIndex;
+	for(y=y0; y<bm->height+y0; y++)
+	{
+		for(x=x0;x<bm->width+x0; x++)
+		{
+			bgrIndex = ((y-y0) * bm->width + (x-x0)) * 4;
+			lcd[y*800*4+x*4+0] = bm->map[bgrIndex + 0];//B
+	        lcd[y*800*4+x*4+1] = bm->map[bgrIndex + 1];//G
+	        lcd[y*800*4+x*4+2] = bm->map[bgrIndex + 2];//R
+	        lcd[y*800*4+x*4+3] = bm->map[bgrIndex + 3];//A			
+		}
+		
+	}
+} 
+
+/*
+text:你要显示的文本
+pixelSize:字体的大小  最大为72
+outFrameWidth:输出框的宽度
+outFrameHeight:输出框的高度
+outFrameColor:输出框的背景颜色
+fontPosX:文本相对于输出框的位置 X
+fontPosY:文本相对于输出框的位置 Y
+fontColor：文本的颜色
+frameToLcdPosX:输出框相对于液晶屏的位置坐标X
+frameToLcdPosY:输出框相对于液晶屏的位置坐标Y
+*/
+void font_show(char *text,int pixelSize,int outFrameWidth,int outFrameHeight,int outFrameColor,int fontPosX,int fontPosY,int fontColor,int frameToLcdPosX,int frameToLcdPosY)
+{
+	//1.初始化字库 
+    // 注意要先将ttf文件放入开发板上
+    font *f = fontLoad("simfang.ttf"); // 指定字库文件，比如simfang.ttf
+
+    //2.设置字体的大小 
+    fontSetSize(f, pixelSize);
+
+    //3.设置字体输出框的大小
+    bitmap *bm;
+    bm = createBitmapWithInit(outFrameWidth, outFrameHeight, 4, outFrameColor);
+
+    //4.把字体输出到输出框中
+    fontPrint(f, bm, fontPosX, fontPosY, text, fontColor, 0);
+
+    //5.将bm妥善地放置到LCD上显示出来
+    showbitmap(bm, frameToLcdPosX, frameToLcdPosY);
+
+	// 关闭bitmap
+	destroyBitmap(bm);
+   
+	// 关闭字体库
+	fontUnload(f);
+}
+//
+//编译指令：arm-linux-gcc *.c -o test -lm  -lpthread
+
+int main(int argc, char const *argv[])
+{
+	lcd_init();
+	
+    font_show("你好123",
+	          64,//中文64*64  数字、英文 64*32
+		      360,
+		      68,
+		      0x00ffff00,//0x00ff0000  	R00 Gff B00 A00--》绿色
+		      68,
+		      2,
+		      0x00ff0000,//绿色
+		      210,
+		      0);
+
+    return 0;
+}
