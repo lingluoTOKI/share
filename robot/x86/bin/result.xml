@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?><nlp>
+  <version>1.1</version>
+  <rawtext>显示当前场景</rawtext>
+  <confidence>76</confidence>
+  <engine>local</engine>
+  <result>
+    <focus>cmd</focus>
+    <confidence>77</confidence>
+    <object>
+      <cmd id="100">显示当前场景</cmd>
+    </object>
+  </result>
+</nlp>
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?><nlp>
+  <version>1.1</version>
+  <rawtext>再见</rawtext>
+  <confidence>63</confidence>
+  <engine>local</engine>
+  <result>
+    <focus>cmd</focus>
+    <confidence>75</confidence>
+    <object>
+      <cmd id="2">再见</cmd>
+    </object>
+  </result>
+</nlp>

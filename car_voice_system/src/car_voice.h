@@ -18,24 +18,24 @@
 #define SCENE_X     0
 #define SCENE_Y     56
 #define SCENE_W     800
-#define SCENE_H     324
+#define SCENE_H     324       /* 56 + 324 = 380 */
 
 /* 对话条（底部偏上） */
 #define DIALOG_X    0
 #define DIALOG_Y    380
 #define DIALOG_W    800
-#define DIALOG_H    40
+#define DIALOG_H    40        /* 380 + 40 = 420 */
 
 /* 底部按钮（"按回车说话"） */
 #define BTN_X0      0
-#define BTN_Y0      420
-#define BTN_X1      800
-#define BTN_Y1      480
+#define BTN_Y0    420
+#define BTN_X1    800
+#define BTN_Y1    480
 
-/* 启动界面【启动】按钮（绘制 + 触摸判定使用同一矩形） */
-#define START_BTN_X0  320
-#define START_BTN_Y0  310
-#define START_BTN_X1  480
+/* 启动界面【启动】按钮（屏幕中央） */
+#define START_BTN_X0  300
+#define START_BTN_Y0  300
+#define START_BTN_X1  500
 #define START_BTN_Y1  380
 
 /* 触摸屏原始坐标范围 */
@@ -71,6 +71,7 @@ void show_bye_screen(font *ft);
 void show_led_scene(font *ft, int on);
 void show_ac_scene(font *ft, int temp, int on);
 void show_win_scene(font *ft, int open);
+void show_scene_overview(font *ft);
 void show_dialog(font *ft, char *text);
 void fill_screen_color(int r, int g, int b);
 void print_greeting(font *ft);

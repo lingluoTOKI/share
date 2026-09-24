@@ -8,18 +8,25 @@
  *   Y=56  ~ 380  场景 BMP（铺满整屏）
  *   Y=380 ~ 420  对话条
  *   Y=420 ~ 480  底部按钮条
+ *
+ * 说明：所有场景回复语显示 3 秒后回到主界面
  * ===================================================================== */
 
 #include "car_voice.h"
 
 /* ---------------- 场景图片路径 ---------------- */
-#define IMG_HELLO    "/img/1.bmp"
-#define IMG_BYE      "/img/10.bmp"
-#define IMG_LED_ON   "/img/light.bmp"
-#define IMG_LED_OFF  "/img/light_off.bmp"
-#define IMG_AC       "/img/ac.bmp"
-#define IMG_WIN      "/img/window.bmp"
-#define IMG_MAIN     "/img/10.bmp"
+#define IMG_HELLO     "/img/1.bmp"
+#define IMG_BYE       "/img/10.bmp"
+#define IMG_MAIN      "/img/10.bmp"
+#define IMG_LED_ON    "/img/light.bmp"
+#define IMG_LED_OFF   "/img/light_off.bmp"
+#define IMG_AC_ON     "/img/20.bmp"
+#define IMG_AC_OFF    "/img/21.bmp"
+#define IMG_AC_HOT    "/img/22.bmp"
+#define IMG_AC_COOL   "/img/23.bmp"
+#define IMG_WIN_OPEN  "/img/30.bmp"
+#define IMG_WIN_CLOSE "/img/31.bmp"
+#define IMG_SCENE     "/img/100.bmp"
 
 #define REC_SEC     3
 #define DEFAULT_IP  "192.168.5.4"
@@ -52,8 +59,6 @@ void fill_screen_color(int r, int g, int b)
         }
 }
 
-/* 把 bitmap 拷贝到 LCD；bitmap 内部布局为 [R][G][B][A]，
- * LCD 帧缓冲布局为 [B][G][R][A]，blit 时交换 B/R 字节。 */
 static void blit_bitmap(bitmap *bm, int dst_x, int dst_y)
 {
     int x, y;
@@ -64,32 +69,11 @@ static void blit_bitmap(bitmap *bm, int dst_x, int dst_y)
             int py = dst_y + y;
             if (px >= 0 && px < SCREEN_W && py >= 0 && py < SCREEN_H)
             {
-                /* 跳过完全透明像素 */
                 if (bm->map[y*bm->width*4 + x*4 + 3] == 0) continue;
                 lcd[py*SCREEN_W*4 + px*4 + 0] = bm->map[y*bm->width*4 + x*4 + 2];
                 lcd[py*SCREEN_W*4 + px*4 + 1] = bm->map[y*bm->width*4 + x*4 + 1];
                 lcd[py*SCREEN_W*4 + px*4 + 2] = bm->map[y*bm->width*4 + x*4 + 0];
                 lcd[py*SCREEN_W*4 + px*4 + 3] = 0;
-            }
-        }
-}
-
-/* 从 LCD 拷贝一块区域到 bitmap（用于“透明”文字层的底图），
- * 保证 fontPrint 抗锯齿时读到正确的背景色 */
-static void blit_lcd_to_bitmap(bitmap *bm, int src_x, int src_y)
-{
-    int x, y;
-    for (y = 0; y < (int)bm->height; y++)
-        for (x = 0; x < (int)bm->width; x++)
-        {
-            int px = src_x + x;
-            int py = src_y + y;
-            if (px >= 0 && px < SCREEN_W && py >= 0 && py < SCREEN_H)
-            {
-                bm->map[y*bm->width*4 + x*4 + 0] = lcd[py*SCREEN_W*4 + px*4 + 2]; /* R */
-                bm->map[y*bm->width*4 + x*4 + 1] = lcd[py*SCREEN_W*4 + px*4 + 1]; /* G */
-                bm->map[y*bm->width*4 + x*4 + 2] = lcd[py*SCREEN_W*4 + px*4 + 0]; /* B */
-                bm->map[y*bm->width*4 + x*4 + 3] = 255;                           /* A */
             }
         }
 }
@@ -108,7 +92,6 @@ static void draw_hline(int x0, int x1, int y, int r, int g, int b)
         }
 }
 
-/* 估算 UTF-8 文字宽度：中文每字 ≈ 字号，ASCII 每字 ≈ 字号/2 */
 static int utf8_width(const char *text, int font_size)
 {
     int w = 0;
@@ -124,7 +107,6 @@ static int utf8_width(const char *text, int font_size)
     return w;
 }
 
-/* 居中打印：把 text 在 bm 中水平居中，y 是文字顶部 */
 static void font_print_center(font *ft, bitmap *bm, int y,
                               const char *text, color c, int font_size)
 {
@@ -144,34 +126,31 @@ void show_dialog(font *ft, char *text)
     bitmap *bm = createBitmap(DIALOG_W, DIALOG_H, 4);
     if (!bm) return;
 
-    /* 整个对话条背景 + 左侧强调条 */
     for (y = 0; y < DIALOG_H; y++) {
         for (x = 0; x < DIALOG_W; x++) {
             if (x < 3) {
-                /* 青色强调条：[R=0, G=140, B=180] */
-                bm->map[y*DIALOG_W*4 + x*4 + 0] = 0;
-                bm->map[y*DIALOG_W*4 + x*4 + 1] = 140;
-                bm->map[y*DIALOG_W*4 + x*4 + 2] = 180;
+                bm->map[y*DIALOG_W*4 + x*4 + 0] = 255;
+                bm->map[y*DIALOG_W*4 + x*4 + 1] = 180;
+                bm->map[y*DIALOG_W*4 + x*4 + 2] = 0;
                 bm->map[y*DIALOG_W*4 + x*4 + 3] = 255;
             } else {
-                bm->map[y*DIALOG_W*4 + x*4 + 0] = 25;
-                bm->map[y*DIALOG_W*4 + x*4 + 1] = 25;
-                bm->map[y*DIALOG_W*4 + x*4 + 2] = 30;
+                bm->map[y*DIALOG_W*4 + x*4 + 0] = 20;
+                bm->map[y*DIALOG_W*4 + x*4 + 1] = 20;
+                bm->map[y*DIALOG_W*4 + x*4 + 2] = 25;
                 bm->map[y*DIALOG_W*4 + x*4 + 3] = 255;
             }
         }
     }
 
-    /* 文字（左对齐） */
-    fontSetSize(ft, 22);
-    fontPrint(ft, bm, 16, 8, text, getColor(255, 240, 240, 240), DIALOG_W - 20);
+    fontSetSize(ft, 24);
+    fontPrint(ft, bm, 16, 8, text, getColor(255, 255, 255, 255), DIALOG_W - 20);
 
     blit_bitmap(bm, DIALOG_X, DIALOG_Y);
     destroyBitmap(bm);
 }
 
 /* ====================================================================
- *                          标题栏（顶部 Y=0 ~ 56）
+ *                          标题栏（Y=0 ~ 56）
  * ==================================================================== */
 void show_status(font *ft)
 {
@@ -181,12 +160,11 @@ void show_status(font *ft)
     bitmap *bm = createBitmap(SCREEN_W, TITLE_H, 4);
     if (!bm) return;
 
-    /* 渐变背景直接画进 bitmap */
     for (y = 0; y < TITLE_H; y++)
     {
-        int r = 25 - 10 * y / TITLE_H;
-        int g = 40 - 15 * y / TITLE_H;
-        int b = 70 - 25 * y / TITLE_H;
+        int r = 30 - 15 * y / TITLE_H;
+        int g = 45 - 20 * y / TITLE_H;
+        int b = 75 - 30 * y / TITLE_H;
         for (x = 0; x < SCREEN_W; x++)
         {
             bm->map[y*SCREEN_W*4 + x*4 + 0] = r;
@@ -196,12 +174,10 @@ void show_status(font *ft)
         }
     }
 
-    /* 左侧标题 */
     fontSetSize(ft, 26);
     fontPrint(ft, bm, 20, 14, "车载语音助手",
-              getColor(255, 180, 220, 255), 240);
+              getColor(255, 180, 230, 255), 240);
 
-    /* 右侧状态 */
     snprintf(buf, sizeof(buf), "车灯:%s  空调:%s(%d度)  车窗:%s",
              g_led_on ? "开" : "关", g_ac_on ? "开" : "关", g_temp,
              g_win_open ? "开" : "关");
@@ -214,7 +190,7 @@ void show_status(font *ft)
     blit_bitmap(bm, 0, TITLE_Y);
     destroyBitmap(bm);
 
-    draw_hline(0, SCREEN_W - 1, TITLE_Y + TITLE_H - 1, 100, 140, 200);
+    draw_hline(0, SCREEN_W - 1, TITLE_Y + TITLE_H - 1, 0, 220, 255);
 }
 
 /* ====================================================================
@@ -226,9 +202,9 @@ void draw_talk_button(font *ft)
 
     for (y = BTN_Y0; y < BTN_Y1; y++)
     {
-        int r = 30 - 10 * (y - BTN_Y0) / (BTN_Y1 - BTN_Y0);
-        int g = 90 - 30 * (y - BTN_Y0) / (BTN_Y1 - BTN_Y0);
-        int b = 160 - 50 * (y - BTN_Y0) / (BTN_Y1 - BTN_Y0);
+        int r = 0;
+        int g = 150 - 50 * (y - BTN_Y0) / (BTN_Y1 - BTN_Y0);
+        int b = 255 - 50 * (y - BTN_Y0) / (BTN_Y1 - BTN_Y0);
         for (x = 0; x < SCREEN_W; x++)
         {
             lcd[y*SCREEN_W*4 + x*4 + 0] = b;
@@ -240,48 +216,45 @@ void draw_talk_button(font *ft)
 
     fontSetSize(ft, 26);
     bitmap *bm = createBitmapWithInit(BTN_X1 - BTN_X0, BTN_Y1 - BTN_Y0, 4,
-                                      getColor(255, 30, 90, 160));
+                                      getColor(255, 0, 150, 255));
     font_print_center(ft, bm, 18, "按回车键说话", getColor(255, 255, 255, 255), 26);
     blit_bitmap(bm, BTN_X0, BTN_Y0);
     destroyBitmap(bm);
 
-    draw_hline(0, SCREEN_W - 1, BTN_Y0, 120, 180, 240);
+    draw_hline(0, SCREEN_W - 1, BTN_Y0, 0, 220, 255);
 }
 
 /* ====================================================================
- *                          启动按钮（居中）
+ *                          启动按钮
  * ==================================================================== */
 void draw_start_button(font *ft)
 {
     int x, y;
 
-    /* 阴影 */
-    for (y = START_BTN_Y0 + 3; y < START_BTN_Y1 + 3; y++)
-        for (x = START_BTN_X0 + 3; x < START_BTN_X1 + 3; x++)
+    for (y = START_BTN_Y0 + 4; y < START_BTN_Y1 + 4; y++)
+        for (x = START_BTN_X0 + 4; x < START_BTN_X1 + 4; x++)
             if (x >= 0 && x < SCREEN_W && y >= 0 && y < SCREEN_H)
             {
                 lcd[y*SCREEN_W*4 + x*4 + 0] = 10;
-                lcd[y*SCREEN_W*4 + x*4 + 1] = 15;
-                lcd[y*SCREEN_W*4 + x*4 + 2] = 25;
+                lcd[y*SCREEN_W*4 + x*4 + 1] = 10;
+                lcd[y*SCREEN_W*4 + x*4 + 2] = 10;
                 lcd[y*SCREEN_W*4 + x*4 + 3] = 0;
             }
 
-    /* 主体 */
     for (y = START_BTN_Y0; y < START_BTN_Y1; y++)
         for (x = START_BTN_X0; x < START_BTN_X1; x++)
         {
-            lcd[y*SCREEN_W*4 + x*4 + 0] = 0;
-            lcd[y*SCREEN_W*4 + x*4 + 1] = 140;
-            lcd[y*SCREEN_W*4 + x*4 + 2] = 255;
+            lcd[y*SCREEN_W*4 + x*4 + 0] = 255;
+            lcd[y*SCREEN_W*4 + x*4 + 1] = 150;
+            lcd[y*SCREEN_W*4 + x*4 + 2] = 0;
             lcd[y*SCREEN_W*4 + x*4 + 3] = 0;
         }
 
-    /* 文字居中 */
-    fontSetSize(ft, 36);
+    fontSetSize(ft, 40);
     bitmap *bm = createBitmapWithInit(START_BTN_X1 - START_BTN_X0,
                                       START_BTN_Y1 - START_BTN_Y0, 4,
-                                      getColor(255, 255, 140, 0));
-    font_print_center(ft, bm, 12, "启 动", getColor(255, 255, 255, 255), 36);
+                                      getColor(255, 0, 150, 255));
+    font_print_center(ft, bm, 14, "启 动", getColor(255, 255, 255, 255), 40);
     blit_bitmap(bm, START_BTN_X0, START_BTN_Y0);
     destroyBitmap(bm);
 }
@@ -298,7 +271,6 @@ int wait_start_button(void)
     return 0;
 }
 
-/* 底部按钮条任意位置点击即返回 1 */
 int wait_talk_button(void)
 {
     int rx = 0, ry = 0;
@@ -311,7 +283,7 @@ int wait_talk_button(void)
 }
 
 /* ====================================================================
- *                          场景显示（图片铺满整屏，UI 叠加）
+ *                          场景显示
  * ==================================================================== */
 static void show_scene_bmp(font *ft, const char *path)
 {
@@ -327,12 +299,11 @@ void show_start_screen(font *ft)
 {
     int x, y, i, dx, dy;
 
-    /* 1. 渐变背景 */
     for (y = 0; y < SCREEN_H; y++)
     {
-        int r = 15 - 10 * y / SCREEN_H;
-        int g = 25 - 20 * y / SCREEN_H;
-        int b = 45 - 35 * y / SCREEN_H;
+        int r = 10 - 10 * y / SCREEN_H;
+        int g = 20 - 20 * y / SCREEN_H;
+        int b = 40 - 40 * y / SCREEN_H;
         for (x = 0; x < SCREEN_W; x++)
         {
             lcd[y*SCREEN_W*4 + x*4 + 0] = b;
@@ -342,9 +313,8 @@ void show_start_screen(font *ft)
         }
     }
 
-    /* 2. 顶部三个装饰点 */
     int dot_x[3] = { 370, 400, 430 };
-    int dot_y = 60;
+    int dot_y = 55;
     int dot_r = 5;
     for (i = 0; i < 3; i++)
     {
@@ -356,49 +326,39 @@ void show_start_screen(font *ft)
                     int py = dot_y + dy;
                     if (px >= 0 && px < SCREEN_W && py >= 0 && py < SCREEN_H)
                     {
-                        lcd[py*SCREEN_W*4 + px*4 + 0] = 200;
-                        lcd[py*SCREEN_W*4 + px*4 + 1] = 150;
-                        lcd[py*SCREEN_W*4 + px*4 + 2] = 100;
+                        lcd[py*SCREEN_W*4 + px*4 + 0] = 255;
+                        lcd[py*SCREEN_W*4 + px*4 + 1] = 220;
+                        lcd[py*SCREEN_W*4 + px*4 + 2] = 0;
                         lcd[py*SCREEN_W*4 + px*4 + 3] = 0;
                     }
                 }
     }
 
-    /* 3. 主标题（居中，用 LCD 已画好的渐变作底） */
-    bitmap *bm = createBitmap(SCREEN_W, 80, 4);
-    blit_lcd_to_bitmap(bm, 0, 100);
-    fontSetSize(ft, 52);
-    font_print_center(ft, bm, 20, "车载语音",
-                      getColor(255, 255, 200, 100), 52);
-    blit_bitmap(bm, 0, 100);
+    bitmap *bm = createBitmapWithInit(SCREEN_W, 80, 4, getColor(255, 0, 0, 0));
+    fontSetSize(ft, 56);
+    font_print_center(ft, bm, 12, "车载语音", getColor(255, 255, 220, 0), 56);
+    blit_bitmap(bm, 0, 95);
     destroyBitmap(bm);
 
-    /* 4. 装饰线 */
-    draw_hline(230, 570, 95, 100, 70, 50);
-    draw_hline(230, 570, 185, 100, 70, 50);
+    draw_hline(230, 570, 95, 0, 220, 255);
+    draw_hline(230, 570, 180, 0, 220, 255);
 
-    /* 5. 副标题（居中） */
-    bitmap *bm2 = createBitmap(SCREEN_W, 40, 4);
-    blit_lcd_to_bitmap(bm2, 0, 200);
-    fontSetSize(ft, 24);
-    font_print_center(ft, bm2, 6, "智能车载语音助手",
-                      getColor(255, 140, 180, 255), 24);
-    blit_bitmap(bm2, 0, 200);
+    bitmap *bm2 = createBitmapWithInit(SCREEN_W, 44, 4, getColor(255, 0, 0, 0));
+    fontSetSize(ft, 26);
+    font_print_center(ft, bm2, 8, "智能车载语音助手",
+                      getColor(255, 180, 230, 255), 26);
+    blit_bitmap(bm2, 0, 195);
     destroyBitmap(bm2);
 
-    /* 6. 启动按钮 */
     draw_start_button(ft);
 
-    /* 7. 底部功能提示 */
-    bitmap *bm4 = createBitmap(SCREEN_W, 30, 4);
-    blit_lcd_to_bitmap(bm4, 0, 430);
-    fontSetSize(ft, 20);
+    bitmap *bm4 = createBitmapWithInit(SCREEN_W, 30, 4, getColor(255, 0, 0, 0));
+    fontSetSize(ft, 22);
     font_print_center(ft, bm4, 4, "车灯 · 空调 · 车窗 · 语音控制",
-                      getColor(255, 130, 130, 160), 20);
-    blit_bitmap(bm4, 0, 430);
+                      getColor(255, 160, 220, 255), 22);
+    blit_bitmap(bm4, 0, 425);
     destroyBitmap(bm4);
 
-    /* 8. 对话条提示 */
     show_dialog(ft, "请点击【启动】按钮，连接语音识别引擎");
 }
 
@@ -419,14 +379,24 @@ void show_led_scene(font *ft, int on)
 
 void show_ac_scene(font *ft, int temp, int on)
 {
-    (void)temp; (void)on;
-    show_scene_bmp(ft, IMG_AC);
+    if (!on)
+        show_scene_bmp(ft, IMG_AC_OFF);
+    else if (temp < 24)
+        show_scene_bmp(ft, IMG_AC_COOL);
+    else if (temp > 24)
+        show_scene_bmp(ft, IMG_AC_HOT);
+    else
+        show_scene_bmp(ft, IMG_AC_ON);
 }
 
 void show_win_scene(font *ft, int open)
 {
-    (void)open;
-    show_scene_bmp(ft, IMG_WIN);
+    show_scene_bmp(ft, open ? IMG_WIN_OPEN : IMG_WIN_CLOSE);
+}
+
+void show_scene_overview(font *ft)
+{
+    show_scene_bmp(ft, IMG_SCENE);
 }
 
 void print_greeting(font *ft)
@@ -434,8 +404,6 @@ void print_greeting(font *ft)
     show_dialog(ft, "您好，我是车载语音助手，请问需要什么帮助？");
 }
 
-/* LED 控制：2 字节协议 —— buf[0]=状态, buf[1]=灯号
- * 注意：若驱动协议不同请按实际驱动修改 */
 int led_ctl(int n, int sta)
 {
     int fd = open("/dev/led_drv", O_RDWR);
@@ -449,7 +417,6 @@ int led_ctl(int n, int sta)
     return (ret == 2) ? 0 : -1;
 }
 
-/* 清空 stdin 行缓冲 */
 static void wait_enter(void)
 {
     int c;
@@ -468,7 +435,7 @@ int main(int argc, char *argv[])
     if (lcd_init() != 0) { printf("lcd init failed\n"); return -1; }
     if (ts_init() != 0)  { printf("ts init failed\n"); lcd_close(); return -1; }
 
-    font *ft = fontLoad("./simfang.ttf");
+    font *ft = fontLoad("/simfang.ttf");
     if (ft == NULL)
     {
         printf("font load error\n");
@@ -482,7 +449,7 @@ int main(int argc, char *argv[])
         ;
 
     print_greeting(ft);
-    sleep(2);
+    sleep(3);                     /* 问候语显示 3 秒 */
 
     sockfd = init_sock(server_ip);
 
@@ -505,7 +472,7 @@ int main(int argc, char *argv[])
         if (rc != 0)
         {
             show_dialog(ft, "录音失败，请检查麦克风或 arecord。");
-            sleep(2);
+            sleep(3);              /* 显示 3 秒 */
             show_main_screen(ft);
             continue;
         }
@@ -516,7 +483,7 @@ int main(int argc, char *argv[])
         if (id == NULL)
         {
             show_dialog(ft, "抱歉，没有听清，请再说一遍。");
-            sleep(1);
+            sleep(3);              /* 显示 3 秒 */
             close(sockfd);
             printf("reconnect to server...\n");
             sockfd = init_sock(server_ip);
@@ -532,40 +499,42 @@ int main(int argc, char *argv[])
         case CMD_HELLO:
             show_hello_screen(ft);
             show_dialog(ft, "您好，我是车载语音助手，很高兴为您服务！");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_BYE:
             show_bye_screen(ft);
             show_dialog(ft, "再见，祝您出行愉快！");
-            sleep(2);
+            sleep(3);              /* 显示 3 秒 */
             goto exit_loop;
 
         case CMD_LED_ON:
             g_led_on = 1;
             show_led_scene(ft, g_led_on);
             show_dialog(ft, "好的，已为您打开车载大灯。");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_LED_OFF:
             g_led_on = 0;
             show_led_scene(ft, g_led_on);
             show_dialog(ft, "好的，已为您关闭车载大灯。");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_AC_ON:
             g_ac_on = 1;
+            g_temp = 24;
             show_ac_scene(ft, g_temp, g_ac_on);
-            {
-                char buf[64];
-                snprintf(buf, sizeof(buf), "好的，空调已开启，当前温度 %d 度。", g_temp);
-                show_dialog(ft, buf);
-            }
+            show_dialog(ft, "好的，空调已开启，当前温度 24 度。");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_AC_OFF:
             g_ac_on = 0;
             show_ac_scene(ft, g_temp, g_ac_on);
             show_dialog(ft, "好的，已为您关闭空调。");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_AC_HOT:
@@ -576,6 +545,7 @@ int main(int argc, char *argv[])
                 snprintf(buf, sizeof(buf), "好的，已调高温度，当前 %d 度。", g_temp);
                 show_dialog(ft, buf);
             }
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_AC_COOL:
@@ -586,30 +556,33 @@ int main(int argc, char *argv[])
                 snprintf(buf, sizeof(buf), "好的，已调低温度，当前 %d 度。", g_temp);
                 show_dialog(ft, buf);
             }
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_WIN_OPEN:
             g_win_open = 1;
             show_win_scene(ft, g_win_open);
             show_dialog(ft, "好的，已为您降下车窗。");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_WIN_CLOSE:
             g_win_open = 0;
             show_win_scene(ft, g_win_open);
             show_dialog(ft, "好的，已为您升起车窗。");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         case CMD_SCENE:
-            if (g_led_on)        show_led_scene(ft, 1);
-            else if (g_ac_on)    show_ac_scene(ft, g_temp, 1);
-            else if (g_win_open) show_win_scene(ft, 1);
-            else                 show_main_screen(ft);
-            show_dialog(ft, "当前正在显示车载场景，请查看屏幕。");
+            show_scene_overview(ft);
+            show_dialog(ft, "当前正在显示车载场景总览。");
+            sleep(3);              /* 显示 3 秒 */
             break;
 
         default:
             show_dialog(ft, "抱歉，暂不支持该指令。");
+            sleep(3);              /* 显示 3 秒 */
+            show_main_screen(ft);
             break;
         }
     }

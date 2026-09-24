@@ -1,15 +1,15 @@
 ============================================================
-Time  2016/12/15 14:12:28 144 
+Time  2016/12/15 15:22:59 895 
 ============================================================
-[2016/12/15 14:12:28 145] grm_lex    264  SYS_MSG_LOAD  
-[2016/12/15 14:12:28 146] grm_lex    281  SYS_MSG_REGCB  
-[2016/12/15 14:12:28 149] grm_lex    267  SYS_MSG_UNLOAD  
-[2016/12/15 14:12:28 151] grm_lex    281  SYS_MSG_REGCB  
-[2016/12/15 14:12:28 153] grm_lex    251  ISR_MSG_BUILDGRAMMAR  
-[2016/12/15 14:12:28 154] grm_lex    100  grm_type :  bnf  
-[2016/12/15 14:12:28 154] grm_lex    106  engine_type  :  local  
-[2016/12/15 14:12:28 155] grm_lex    106  asr_res_path  :  fo|res/asr/common.jet  
-[2016/12/15 14:12:28 155] grm_lex    106  sample_rate  :  16000  
-[2016/12/15 14:12:28 157] grm_lex    106  grm_build_path  :  res/asr/GrmBuilld  
-[2016/12/15 14:12:28 176] grm_lex    254  ISR_MSG_BUILDGRAMMAR ret =  0  
-[2016/12/15 14:12:28 256] grm_lex    71   0  cmd  
+[2016/12/15 15:22:59 896] grm_lex    264  SYS_MSG_LOAD  
+[2016/12/15 15:22:59 897] grm_lex    281  SYS_MSG_REGCB  
+[2016/12/15 15:22:59 898] grm_lex    267  SYS_MSG_UNLOAD  
+[2016/12/15 15:22:59 900] grm_lex    281  SYS_MSG_REGCB  
+[2016/12/15 15:22:59 903] grm_lex    251  ISR_MSG_BUILDGRAMMAR  
+[2016/12/15 15:22:59 903] grm_lex    100  grm_type :  bnf  
+[2016/12/15 15:22:59 904] grm_lex    106  engine_type  :  local  
+[2016/12/15 15:22:59 904] grm_lex    106  asr_res_path  :  fo|res/asr/common.jet  
+[2016/12/15 15:22:59 905] grm_lex    106  sample_rate  :  16000  
+[2016/12/15 15:22:59 905] grm_lex    106  grm_build_path  :  res/asr/GrmBuilld  
+[2016/12/15 15:22:59 914] grm_lex    254  ISR_MSG_BUILDGRAMMAR ret =  0  
+[2016/12/15 15:22:59 978] grm_lex    71   0  cmd  

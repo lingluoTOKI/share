@@ -1,5 +1,5 @@
 #include "font.h"
-#include "truetype.h"    /* 让 stbtt_fontinfo 变成完整类型 */
+#include "truetype.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +14,6 @@
 #define wchar s32
 #define wchar_to_str(wc) ((char *)(wc))
 
-
 #define color u32
 #define getColor(a, b, c, d) (a|b<<8|c<<16|d<<24)
 #define getA(c) ((c>> 0)&0x000000ff)
@@ -26,7 +25,6 @@
 u32 wstrlen(wchar *ws);
 wchar *utf8_to_ucs2(char *code);
 
-
 extern int stbtt_InitFont(stbtt_fontinfo *info, const unsigned char *data, int offset);
 
 int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint);
@@ -36,7 +34,7 @@ void stbtt_GetFontVMetrics(const stbtt_fontinfo *info, int *ascent, int *descent
 void stbtt_GetFontBoundingBox(const stbtt_fontinfo *info, int *x0, int *y0, int *x1, int *y1);
 void stbtt_GetCodepointHMetrics(const stbtt_fontinfo *info, int codepoint, int *advanceWidth, int *leftSideBearing);
 int  stbtt_GetCodepointKernAdvance(const stbtt_fontinfo *info, int ch1, int ch2);
-int  stbtt_GetCodepointBox(const stbtt_fontinfo *info, int codepoint, int *x0, int *y0, int *x1, int *y1);
+int stbtt_GetCodepointBox(const stbtt_fontinfo *info, int codepoint, int *x0, int *y0, int *x1, int *y1);
 void stbtt_GetGlyphHMetrics(const stbtt_fontinfo *info, int glyph_index, int *advanceWidth, int *leftSideBearing);
 int  stbtt_GetGlyphKernAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2);
 int  stbtt_GetGlyphBox(const stbtt_fontinfo *info, int glyph_index, int *x0, int *y0, int *x1, int *y1);
@@ -47,19 +45,26 @@ void stbtt_MakeCodepointBitmap(const stbtt_fontinfo *info, unsigned char *output
 
 bitmap *createBitmap(u32 width, u32 height, u32 byteperpixel){
 	bitmap *bm = (bitmap *)malloc(sizeof(bitmap));
+	if (!bm) return NULL;
 	bzero(bm, sizeof(bitmap));
 	bm->height = height;
 	bm->width = width;
 	bm->byteperpixel = byteperpixel;
 	bm->map = (u8 *)malloc(width*height*byteperpixel);
+	if (!bm->map) {
+		free(bm);
+		return NULL;
+	}
 	bzero(bm->map, width*height*byteperpixel);
 	return bm;
 }
 
 void destroyBitmap(bitmap *bm){
-	bzero(bm->map, bm->height * bm->width * bm->byteperpixel);
-	free(bm->map);
-	bzero(bm, sizeof(bitmap));
+	if (!bm) return;
+	if (bm->map) {
+		free(bm->map);
+		bm->map = NULL;
+	}
 	free(bm);
 }
 
@@ -94,6 +99,7 @@ void setPixel(bitmap *bm, u32 x, u32 y, color c){
 
 bitmap *createBitmapWithInit(u32 width, u32 height, u32 byteperpixel, color c){
 	bitmap *bm = createBitmap(width, height, byteperpixel);
+	if (!bm) return NULL;
 	u32 x, y;
 	for(y=0; y<height; y++){
 		for(x=0; x<width; x++){
@@ -110,7 +116,6 @@ u32 wstrlen(wchar *ws){
 	return len;
 }
 
-
 wchar *utf8_to_ucs2(char *code){
 	wchar *ucs2 = (wchar *)malloc((strlen(code)+2)*sizeof(wchar));
 	bzero(ucs2, (strlen(code)+2)*sizeof(wchar));
@@ -121,45 +126,26 @@ wchar *utf8_to_ucs2(char *code){
 		u32 i = 0;
 		u32 index = (utf&com) != 0;
 		u16 binary[16];
-		if(index == 0){///0xxxxxxx ==> 00000000 0xxxxxxxx
-			for(; i < 8; ++i){
-				binary[i] = 0;
-			}
-			for(; i < 16; ++i){
-				binary[i] = (utf & 1 << (15 - i)) != 0;
-			}
-		}else if((utf & (1 << 5)) == 0){// 110xxxxx 10yyyyyy ==> 00000xxx xxyyyyyy
-			for(; i < 5; ++i){
-				binary[i] = 0;
-			}
-			for(; i < 10; ++i){
-				binary[i] = (utf&(1 << (9 - i))) != 0;
-			}
+		if(index == 0){
+			for(; i < 8; ++i) binary[i] = 0;
+			for(; i < 16; ++i) binary[i] = (utf & 1 << (15 - i)) != 0;
+		}else if((utf & (1 << 5)) == 0){
+			for(; i < 5; ++i) binary[i] = 0;
+			for(; i < 10; ++i) binary[i] = (utf&(1 << (9 - i))) != 0;
 			x += 1;
 			utf = code[x];
-			for(; i < 16; ++i){
-				binary[i] = (utf&(1 << (15 - i))) != 0;
-			}
-		}else{//1110xxxx 10yyyyyy 10zzzzzz ==> xxxxyyyy yyzzzzzz
-			for(; i < 4; ++i){
-				binary[i] = (utf & 1 << (3 - i)) != 0;
-			}
+			for(; i < 16; ++i) binary[i] = (utf&(1 << (15 - i))) != 0;
+		}else{
+			for(; i < 4; ++i) binary[i] = (utf & 1 << (3 - i)) != 0;
 			x += 1;
 			utf = code[x];
-			for(; i < 10; ++i){
-				binary[i] = (utf & 1 << (9 - i)) != 0;
-			}
+			for(; i < 10; ++i) binary[i] = (utf & 1 << (9 - i)) != 0;
 			x += 1;
 			utf = code[x];
-			for(; i < 16; ++i){
-				binary[i] = (utf & 1 << (15 - i)) != 0;
-			}
+			for(; i < 16; ++i) binary[i] = (utf & 1 << (15 - i)) != 0;
 		}
 		wchar ch = 0;
-		for(i=0; i <16; i++){
-			ch <<= 1;
-			ch |= binary[i];
-		}
+		for(i=0; i <16; i++){ ch <<= 1; ch |= binary[i]; }
 		u32 len = wstrlen(ucs2);
 		ucs2[len] = ch;
 		ucs2[len+1] = 0;
@@ -168,6 +154,8 @@ wchar *utf8_to_ucs2(char *code){
 }
 
 void fontPrint(font *f, bitmap *screen, s32 x, s32 y, char *text, color c, s32 maxWidth){
+	printf(">>> fontPrint: '%s' at (%d,%d)\n", text, x, y);   /* ★ 调试打印 */
+
 	wchar *wText = utf8_to_ucs2(text);
 	u8 *charRaster = NULL;
 	s32 bx, by, bw, bh;
@@ -198,38 +186,38 @@ void fontPrint(font *f, bitmap *screen, s32 x, s32 y, char *text, color c, s32 m
 			sx = 0;
 		}
 
-		/* ---------- 修改 1：realloc NULL 检查 ---------- */
-		u8 *newRaster = (u8 *)realloc(charRaster, charWidth * charHeight);
-		if (newRaster == NULL) {
-			free(charRaster);
-			free(wText);
-			return;
+		if (charWidth <= 0 || charHeight <= 0) {
+			sx += charWidth > 0 ? charWidth : 0;
+			continue;
 		}
+
+		u8 *newRaster = (u8 *)realloc(charRaster, charWidth*charHeight);
+		if (!newRaster) continue;
 		charRaster = newRaster;
+		bzero(charRaster, charWidth*charHeight);
 
-		stbtt_MakeCodepointBitmap(f->info, charRaster, charWidth, charHeight, charWidth, f->scale, f->scale, wText[i]);
+		stbtt_MakeCodepointBitmap(f->info, charRaster, charWidth, charHeight,
+		                          charWidth, f->scale, f->scale, wText[i]);
 
-
-		
 		s32 advance;
 		stbtt_GetCodepointHMetrics(f->info, wText[i], &advance, 0);
 		s32 kerning = stbtt_GetCodepointKernAdvance(f->info, wText[i], wText[i+1]);
 		s32 printLength = advance * f->scale + kerning * f->scale;
-		
+
 		s32 mx;
 		for(mx=0; mx<printLength; mx++){
-			if(charWidth+mx < printLength-mx){
-				continue;
-			}
+			if(charWidth+mx < printLength-mx) continue;
 			break;
 		}
-		
+
 		s32 ix, iy;
 		for(iy=0; iy<charHeight; iy++){
 			for(ix=0; ix<charWidth; ix++){
 				s32 xpos = x + sx + ix + mx;
 				s32 ypos = (y + sy + oy + iy) - 1;
-				if(charRaster[ix+iy*charWidth]!=0 && xpos<screen->width && ypos<screen->height){
+				if(charRaster[ix+iy*charWidth]!=0 &&
+				   xpos>=0 && xpos<screen->width &&
+				   ypos>=0 && ypos<screen->height){
 					u32 alpha = charRaster[ix+iy*charWidth];
 					u32 invAlpha = 255 - alpha;
 					color bgc = getPixel(screen, xpos, ypos);
@@ -241,14 +229,12 @@ void fontPrint(font *f, bitmap *screen, s32 x, s32 y, char *text, color c, s32 m
 					u8 g = (alpha * getG(c) + invAlpha * bgg) >> 8;
 					u8 b = (alpha * getB(c) + invAlpha * bgb) >> 8;
 
-					/* ---------- 修改 2：alpha 改为 255，避免 blit 时按透明处理 ---------- */
 					setPixel(screen, xpos, ypos, getColor(255, r, g, b));
 				}
 			}
 		}
-		
+
 		bzero(charRaster, charWidth*charHeight);
-	
 		sx += printLength;
 	}
 	free(charRaster);
@@ -260,7 +246,6 @@ void fontSetSize(font *f, s32 pixels){
 }
 
 font *fontLoad(char *fontPath){
-	// 打开字体文件并读取
 	s32 fd = open(fontPath, O_RDONLY);
 	if(fd==-1)
 		return NULL;
@@ -270,7 +255,6 @@ font *fontLoad(char *fontPath){
 	read(fd, buffer, bufferSize);
 	close(fd);
 
-	// 从内存读取
 	font *f = (font *)malloc(sizeof(font));
 	f->info = (stbtt_fontinfo *)malloc(sizeof(stbtt_fontinfo));
 	if(!buffer || bufferSize==0)
@@ -280,7 +264,6 @@ font *fontLoad(char *fontPath){
 	f->buffer = buffer;
 	f->scale = stbtt_ScaleForPixelHeight(f->info, 16);
 
-	// 返回
 	return f;
 }
 
