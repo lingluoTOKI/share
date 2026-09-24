@@ -1,72 +1,92 @@
 #include "lcd.h"
+#include <stdlib.h>
+
 int lcd_fd;
 unsigned char *lcd = NULL;
-//lcd初始化
-int lcd_init()
+
+/* lcd 初始化：打开 /dev/fb0，映射 800x480x4 帧缓冲 */
+int lcd_init(void)
 {
-    //1. 打开lcd驱动（“/dev/fb0”）  open
-    lcd_fd = open("/dev/fb0",O_RDWR);
-	
-	//给驱动申请虚拟共享内存
-	lcd = mmap(NULL,800*480*4,PROT_READ|PROT_WRITE,MAP_SHARED,lcd_fd,0);
-	
-	
+    lcd_fd = open("/dev/fb0", O_RDWR);
+    if (lcd_fd < 0)
+    {
+        perror("open /dev/fb0 failed");
+        return -1;
+    }
+
+    lcd = mmap(NULL, 800*480*4, PROT_READ|PROT_WRITE, MAP_SHARED, lcd_fd, 0);
+    if (lcd == MAP_FAILED)
+    {
+        perror("mmap /dev/fb0 failed");
+        close(lcd_fd);
+        return -1;
+    }
+    return 0;
 }
-//显示图片
-int show_bmp(char *bmpfile, int x0, int y0)//2.bmp  400*240
+
+/* 显示 24 位 BMP 图片到 (x0, y0)。BMP 像素数据 BGR 顺序，LCD 帧缓冲 BGRA */
+int show_bmp(char *bmpfile, int x0, int y0)
 {
-	//打开图片
-	int bmp_fd = open(bmpfile,O_RDWR);
-	if(bmp_fd < 0)
-	{
-		perror("open bmp failed");
-		return -1;
-	}
+    int bmp_fd = open(bmpfile, O_RDWR);
+    if (bmp_fd < 0)
+    {
+        perror("open bmp failed");
+        return -1;
+    }
 
-	//读取属性数据--w  h
-	int  w=0, h=0;
-       
-	//把偏移位置设置到18
-	lseek(bmp_fd, 18, SEEK_SET);
-	
-	//读取图片宽度
-	read(bmp_fd,&w,4);
-	//读取图片高度
-	read(bmp_fd,&h,4);	
-	printf("w %d h %d\n",w,h);
-		
-	//处理头54个字节属性数据
-	lseek(bmp_fd,54,SEEK_SET);
-	//read(bmp_fd,buf,54);
-	//读取颜色数据
-	unsigned char bmp[w*h*3];
-	read(bmp_fd,bmp,w*h*3);
-	
-    //2.准备颜色数据放入虚拟内存
-   // unsigned char lcd[800*480*4]={0};
-    //指针和数组之间，在应用时形式上可以相互转换 
-	int x,y;
-	for(y=y0; y<h+y0; y++)
-	{
-		for(x=x0;x<w+x0; x++)
-		{
-			lcd[y*800*4+x*4+0] = bmp[(h-1-(y-y0))*w*3+(x-x0)*3+0];//B
-	        lcd[y*800*4+x*4+1] = bmp[(h-1-(y-y0))*w*3+(x-x0)*3+1];//G
-	        lcd[y*800*4+x*4+2] = bmp[(h-1-(y-y0))*w*3+(x-x0)*3+2];//R
-	        lcd[y*800*4+x*4+3] = 0;//A			
-		}
-		
-	}
+    int w = 0, h = 0;
+    lseek(bmp_fd, 18, SEEK_SET);
+    if (read(bmp_fd, &w, 4) != 4 || read(bmp_fd, &h, 4) != 4) {
+        close(bmp_fd);
+        return -1;
+    }
 
-    //4.关闭文件close
-	close(bmp_fd);
+    /* 边界检查：避免 w=0 / h=0 / 过大导致 malloc 失败或越界 */
+    if (w <= 0 || h <= 0 || w > 2048 || h > 2048) {
+        fprintf(stderr, "bmp size invalid: w=%d h=%d\n", w, h);
+        close(bmp_fd);
+        return -1;
+    }
 
+    printf("w %d h %d\n", w, h);
+    lseek(bmp_fd, 54, SEEK_SET);
+
+    unsigned char *bmp = (unsigned char *)malloc(w * h * 3);
+    if (!bmp) {
+        perror("malloc bmp failed");
+        close(bmp_fd);
+        return -1;
+    }
+    if (read(bmp_fd, bmp, w * h * 3) != w * h * 3) {
+        fprintf(stderr, "bmp read incomplete\n");
+        free(bmp);
+        close(bmp_fd);
+        return -1;
+    }
+
+    int x, y;
+    for (y = y0; y < h + y0; y++)
+    {
+        if (y < 0 || y >= 480) continue;
+        for (x = x0; x < w + x0; x++)
+        {
+            if (x < 0 || x >= 800) continue;
+            lcd[y*800*4 + x*4 + 0] = bmp[(h-1-(y-y0))*w*3 + (x-x0)*3 + 0]; /* B */
+            lcd[y*800*4 + x*4 + 1] = bmp[(h-1-(y-y0))*w*3 + (x-x0)*3 + 1]; /* G */
+            lcd[y*800*4 + x*4 + 2] = bmp[(h-1-(y-y0))*w*3 + (x-x0)*3 + 2]; /* R */
+            lcd[y*800*4 + x*4 + 3] = 0;                                    /* A */
+        }
+    }
+
+    free(bmp);
+    close(bmp_fd);
+    return 0;
 }
-//关闭lcd
-int lcd_close()
+
+/* 关闭 lcd */
+int lcd_close(void)
 {
-	//4.关闭文件close
     close(lcd_fd);
-    //释放内存
-	munmap(lcd,800*480*4);
+    munmap(lcd, 800*480*4);
+    return 0;
 }

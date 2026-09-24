@@ -1,4 +1,5 @@
 #include "font.h"
+#include "truetype.h"    /* 让 stbtt_fontinfo 变成完整类型 */
 
 #include <stdio.h>
 #include <string.h>
@@ -27,13 +28,6 @@ wchar *utf8_to_ucs2(char *code);
 
 
 extern int stbtt_InitFont(stbtt_fontinfo *info, const unsigned char *data, int offset);
-// Given an offset into the file that defines a font, this function builds
-// the necessary cached info for the rest of the system. You must allocate
-// the stbtt_fontinfo yourself, and stbtt_InitFont will fill it out. You don't
-// need to do anything special to free it, because the contents are pure
-// value data with no additional data structures. Returns 0 on failure.
-
-
 
 int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint);
 float stbtt_ScaleForPixelHeight(const stbtt_fontinfo *info, float pixels);
@@ -42,16 +36,13 @@ void stbtt_GetFontVMetrics(const stbtt_fontinfo *info, int *ascent, int *descent
 void stbtt_GetFontBoundingBox(const stbtt_fontinfo *info, int *x0, int *y0, int *x1, int *y1);
 void stbtt_GetCodepointHMetrics(const stbtt_fontinfo *info, int codepoint, int *advanceWidth, int *leftSideBearing);
 int  stbtt_GetCodepointKernAdvance(const stbtt_fontinfo *info, int ch1, int ch2);
-int stbtt_GetCodepointBox(const stbtt_fontinfo *info, int codepoint, int *x0, int *y0, int *x1, int *y1);
+int  stbtt_GetCodepointBox(const stbtt_fontinfo *info, int codepoint, int *x0, int *y0, int *x1, int *y1);
 void stbtt_GetGlyphHMetrics(const stbtt_fontinfo *info, int glyph_index, int *advanceWidth, int *leftSideBearing);
 int  stbtt_GetGlyphKernAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2);
 int  stbtt_GetGlyphBox(const stbtt_fontinfo *info, int glyph_index, int *x0, int *y0, int *x1, int *y1);
 void stbtt_GetCodepointBitmapBox(const stbtt_fontinfo *font, int codepoint, float scale_x, float scale_y, int *ix0, int *iy0, int *ix1, int *iy1);
 void stbtt_GetCodepointBitmapBoxSubpixel(const stbtt_fontinfo *font, int codepoint, float scale_x, float scale_y, float shift_x, float shift_y, int *ix0, int *iy0, int *ix1, int *iy1);
 void stbtt_MakeCodepointBitmap(const stbtt_fontinfo *info, unsigned char *output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, int codepoint);
-
-
-
 
 
 bitmap *createBitmap(u32 width, u32 height, u32 byteperpixel){
@@ -127,7 +118,6 @@ wchar *utf8_to_ucs2(char *code){
 	u32 x;
 	for(x=0; x<=strlen(code); x++){
 		char utf = code[x];
-		u32 size = 0;
 		u32 i = 0;
 		u32 index = (utf&com) != 0;
 		u16 binary[16];
@@ -138,7 +128,7 @@ wchar *utf8_to_ucs2(char *code){
 			for(; i < 16; ++i){
 				binary[i] = (utf & 1 << (15 - i)) != 0;
 			}
-		}else if(utf&(1 << 5) == 0){// 110xxxxx 10yyyyyy ==> 00000xxx xxyyyyyy
+		}else if((utf & (1 << 5)) == 0){// 110xxxxx 10yyyyyy ==> 00000xxx xxyyyyyy
 			for(; i < 5; ++i){
 				binary[i] = 0;
 			}
@@ -208,8 +198,15 @@ void fontPrint(font *f, bitmap *screen, s32 x, s32 y, char *text, color c, s32 m
 			sx = 0;
 		}
 
-		charRaster = realloc(charRaster, charWidth*charHeight);
-		
+		/* ---------- 修改 1：realloc NULL 检查 ---------- */
+		u8 *newRaster = (u8 *)realloc(charRaster, charWidth * charHeight);
+		if (newRaster == NULL) {
+			free(charRaster);
+			free(wText);
+			return;
+		}
+		charRaster = newRaster;
+
 		stbtt_MakeCodepointBitmap(f->info, charRaster, charWidth, charHeight, charWidth, f->scale, f->scale, wText[i]);
 
 
@@ -230,7 +227,7 @@ void fontPrint(font *f, bitmap *screen, s32 x, s32 y, char *text, color c, s32 m
 		s32 ix, iy;
 		for(iy=0; iy<charHeight; iy++){
 			for(ix=0; ix<charWidth; ix++){
-				s32 xpos = x + sx + ix + mx;// + (printLength-charWidth)/2;
+				s32 xpos = x + sx + ix + mx;
 				s32 ypos = (y + sy + oy + iy) - 1;
 				if(charRaster[ix+iy*charWidth]!=0 && xpos<screen->width && ypos<screen->height){
 					u32 alpha = charRaster[ix+iy*charWidth];
@@ -244,7 +241,8 @@ void fontPrint(font *f, bitmap *screen, s32 x, s32 y, char *text, color c, s32 m
 					u8 g = (alpha * getG(c) + invAlpha * bgg) >> 8;
 					u8 b = (alpha * getB(c) + invAlpha * bgb) >> 8;
 
-					setPixel(screen, xpos, ypos, getColor(0, r, g, b));
+					/* ---------- 修改 2：alpha 改为 255，避免 blit 时按透明处理 ---------- */
+					setPixel(screen, xpos, ypos, getColor(255, r, g, b));
 				}
 			}
 		}
@@ -291,4 +289,3 @@ void fontUnload(font *f){
 	free(f->buffer);
 	free(f);
 }
-

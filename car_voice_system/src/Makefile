@@ -16,7 +16,6 @@ LDFLAGS  += -L ../lib
 
 LDFLAGS += -lxml2
 LDFLAGS += -ljpeg
-LDFLAGS += -lasound
 LDFLAGS += -lz
 LDFLAGS += -lvnet
 LDFLAGS += -lpthread
@@ -26,7 +25,7 @@ LDFLAGS += -lm
 LDFLAGS += -Wl,-rpath=. -Wl,-rpath=../lib
 
 TARGET = car_voice
-SRCS   = main.c common.c lcd.c ts.c font.c truetype.c ptt.c
+SRCS   = main.c common.c lcd.c ts.c font.c truetype.c
 
 $(TARGET): $(SRCS) $(LIBS)
 	$(CC) $(SRCS) -o $@ $(CPPFLAGS) $(LDFLAGS) -Wall
